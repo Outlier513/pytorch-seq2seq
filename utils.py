@@ -10,6 +10,10 @@ def init_weights2(m):
     for name, param in m.named_parameters():
         nn.init.normal_(param.data, mean=0, std=0.01)
 
+def init_weights3(m):
+    for name, param in m.named_parameters():
+        nn.init.normal_(param.data, mean=0, std=0.01)
+
 def count_parameters(model):
     print(f'The model has {sum(p.numel() for p in model.parameters() if p.requires_grad):,}trainable parameters')
 
