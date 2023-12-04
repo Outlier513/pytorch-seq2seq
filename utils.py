@@ -20,31 +20,38 @@ def init_weights3(m):
 
 def count_parameters(model):
     print(
-        f"The model has {sum(p.numel() for p in model.parameters() if p.requires_grad):,}trainable parameters"
+        f"The model has {sum(p.numel() for p in model.parameters() if p.requires_grad):,} trainable parameters"
     )
 
 
 def train(
-    epoch, model, dataloader, n_batch, optimizer, criterion, clip, device, packed=False
+    epoch, model, dataloader, n_batch, optimizer, criterion, clip, device, mode="native"
 ):
     model.train()
     train_loss = 0
     with tqdm(desc=f"Epoch:{epoch+1: 2d}", total=n_batch) as pbar:
         for i, data in enumerate(dataloader):
             optimizer.zero_grad()
-            if packed:
-                src, src_len, trg = data
-                src = src.to(device)
-                trg = trg.to(device)
-                output = model(src, src_len, trg)
-            else:
+            if mode == "native":
                 src, trg = data
                 src = src.to(device)
                 trg = trg.to(device)
                 output = model(src, trg)
+            elif mode == "packed":
+                src, src_len, trg = data
+                src = src.to(device)
+                trg = trg.to(device)
+                output = model(src, src_len, trg)
+            elif mode == "cnn":
+                src, trg = data
+                src = src.to(device)
+                trg = trg.to(device)
+                # trg [trg_len, bs]
+                output, _ = model(src, trg[:-1, :])
+                output = output.permute(1, 0, 2)
             # output [trg_len-1, bs, output_dim]
             output_dim = output.shape[-1]
-            output = output.view(-1, output_dim)
+            output = output.reshape(-1, output_dim)
             trg = trg[1:].view(-1)
             loss = criterion(output, trg)
             loss.backward()
@@ -58,23 +65,30 @@ def train(
                 break
 
 
-def evaluate(model, dataloader, n_batch, criterion, device, packed=False):
+def evaluate(model, dataloader, n_batch, criterion, device, mode="native"):
     model.eval()
     eval_loss = 0
     with tqdm(total=n_batch) as pbar:
         for i, data in enumerate(dataloader):
-            if packed:
-                src, src_len, trg = data
-                src = src.to(device)
-                trg = trg.to(device)
-                output = model(src, src_len, trg)
-            else:
+            if mode == "native":
                 src, trg = data
                 src = src.to(device)
                 trg = trg.to(device)
                 output = model(src, trg)
+            elif mode == "packed":
+                src, src_len, trg = data
+                src = src.to(device)
+                trg = trg.to(device)
+                output = model(src, src_len, trg)
+            elif mode == "cnn":
+                src, trg = data
+                src = src.to(device)
+                trg = trg.to(device)
+                # trg [trg_len, bs]
+                output, _ = model(src, trg[:-1, :])
+                output = output.permute(1, 0, 2)
             output_dim = output.shape[-1]
-            output = output.view(-1, output_dim)
+            output = output.reshape(-1, output_dim)
             trg = trg[1:].view(-1)
             loss = criterion(output, trg)
             eval_loss += loss.item()
